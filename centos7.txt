@@ -1,0 +1,379 @@
+﻿Tengine
+下载
+wget http://tengine.taobao.org/download/tengine-2.1.2.tar.gz
+解压
+tar -zxvf tengine-2.1.2.tar.gz
+解压完成后删除安装包
+rm -rf tengine-2.1.2.tar.gz
+在安装之前首先检查一下是否已安装nginx的一些模块依赖的lib库
+yum install gcc-c++  
+yum -y install pcre pcre-devel  
+yum -y install zlib zlib-devel  
+yum -y install openssl openssl-devel
+
+安装完依赖后下面就可以放心开始安装nginx了，输入安装命令并指定安装路径：
+./configure --prefix=/server/nginx
+
+最后通过make以及make install进行编译安装：
+make
+make install
+
+安装完成后尝试启动一下，进入nginx目录输入启动命令：
+sbin/nginx
+
+修改配置之后
+sbin/nginx -s reload
+
+
+mysql
+
+yum install mariadb mariadb-server 直接安装
+
+
+或者
+1、检查是否已经安装了mysql，命令如下：
+yum list installed | grep mysql
+如果有，先卸载掉然后再进行安装。
+yum remove + **
+
+
+wget http://dev.mysql.com/get/mysql-community-release-el7-5.noarch.rpm
+rpm -ivh mysql-community-release-el7-5.noarch.rpm
+出错的话
+yum clean all
+rpm --rebuilddb
+yum update
+
+
+yum install mysql-community-server
+service mysqld restart
+察看临时密码
+grep "password" /var/log/mysqld.log
+
+登陆
+grant all privileges on *.* to root@"localhost" identified by "新密码";
+刷新权限使之生效：
+flush privileges;
+更新 MySQL 的用户 root的密码：
+set password = password('新密码');
+注意：由于 MySQL5.7 采用了密码强度验证插件 validate_password，故此我们需要设置一个有一定强度的密码；
+输入 exit 后用新密码再次登录看看吧！ 
+create user 用户名 identified by "密码"；
+grant all privileges on uguwu.* to uguwu@'localhost';
+
+
+13 查看 MySQL 当前都内置了哪些数据库：
+mysql> show databases;
+我们发现其内置了如下一些数据库：
+information_schema
+mysql             
+performance_schema
+sys 
+
+14 启动 MySQL 服务：
+service mysqld start
+
+15 关闭 MySQL 服务：
+service mysqld stop
+
+16 重启 MySQL 服务：
+service mysqld restart
+
+17 查看 MySQL 的状态：
+service mysqld status
+
+18 查看 MySQL 的字符集：
+mysql> show variables like '%character%';
++--------------------------+----------------------------+
+| Variable_name            | Value                      |
++--------------------------+----------------------------+
+| character_set_client    | utf8                      |
+| character_set_connection | utf8                      |
+| character_set_database  | latin1                    |
+| character_set_filesystem | binary                    |
+| character_set_results    | utf8                      |
+| character_set_server    | latin1                    |
+| character_set_system    | utf8                      |
+| character_sets_dir      | /usr/share/mysql/charsets/ |
++--------------------------+----------------------------+
+8 rows in set (0.01 sec)
+查看指定的数据库中指定数据表的字符集，如查看 mysql 数据库中 servers 表的字符集：
+  show table status from mysql like '%servers%';
+查看指定数据库中指定表的全部列的字符集，如查看 mysql 数据库中 servers 表的全部的列的字符集：
+show full columns from servers;
+
+19 设置 MySQL 的字符集为 UTF-8：
+打开 /etc 目录下的 my.cnf 文件（此文件是 MySQL 的主配置文件）：
+/etc/my.cnf
+在 [mysqld] 前添加如下代码：
+[client]
+default-character-set=utf8
+在 [mysqld] 后添加如下代码：
+character_set_server=utf8
+再次查看字符集：
+mysql> show variables like '%character%';
++--------------------------+----------------------------+
+| Variable_name            | Value                      |
++--------------------------+----------------------------+
+| character_set_client    | utf8                      |
+| character_set_connection | utf8                      |
+| character_set_database  | utf8                      |
+| character_set_filesystem | binary                    |
+| character_set_results    | utf8                      |
+| character_set_server    | utf8                      |
+| character_set_system    | utf8                      |
+| character_sets_dir      | /usr/share/mysql/charsets/ |
++--------------------------+----------------------------+
+8 rows in set (0.01 sec)
+
+20 /var/lib/mysql 是存放数据库文件的目录；
+
+21 /var/log 目录下的 mysqld.log 文件记录 MySQL 的日志；
+
+22 MySQL 采用的 TCP/IP 协议传输数据，默认端口号为 3306，我们可以通过如下命令查看：
+netstat -anp
+
+23 忘记密码时，可用如下方法重置：
+# service mysqld stop
+# mysqld_safe --user=root --skip-grant-tables --skip-networking &
+# mysql -u root
+mysql> use mysql;
+mysql> update user set password=password("new_password") where user="root";
+mysql> flush privileges;
+
+
+
+
+
+
+
+一，wget http://dev.mysql.com/get/mysql57-community-release-el6-8.noarch.rpm
+
+二，yum localinstall mysql57-community-release-el6-8.noarch.rpm
+
+三，yum install mysql-server
+
+四，mysqld --initialize --user=mysql
+
+五，找到密码 vi /var/log/mysqld.log
+
+六，修改密码 mysqladmin -uroot -p password
+
+采用拷贝粘贴，输入旧密码，设定新密码
+
+七，chkconfig mysqld on
+
+八，reboot
+
+九，mysql -uroot -p
+
+OK
+注解：yum 安装会按照mysql所需的所有组件。
+yum search xxx
+yun install xxx
+
+
+PHP
+下载
+
+解压完成后删除安装包
+
+# yum -y install libxml2-devel openssl-devel curl-devel libjpeg-devel libpng-devel freetype-devel openldap-devel libmcrypt-devel
+
+
+./configure --prefix=/usr/local/php --with-config-file-path=/usr/local/php/etc --with-mysql=/usr/local/mysql --with-mysqli=/usr/local/mysql/bin/mysql_config --with-iconv=/usr/local --with-freetype-dir --with-jpeg-dir --with-png-dir --with-zlib --with-libxml-dir=/usr --enable-xml --disable-rpath --enable-discard-path --enable-safe-mode --enable-bcmath --enable-shmop --enable-sysvsem --enable-inline-optimization --with-curl --with-curlwrappers --enable-mbregex --enable-fastcgi --enable-fpm --enable-force-cgi-redirect --enable-mbstring --with-mcrypt --with-gd --enable-gd-native-ttf --with-openssl --with-mhash --enable-pcntl --enable-sockets --with-xmlrpc --enable-zip --enable-soap --without-pear --with-zlib --enable-pdo --with-pdo-mysql --enable-opcache
+
+yum install libxml2-devel -y
+
+
+./configure
+make && make install
+
+
+./configure \
+--prefix=/wocloud/php7 \
+--with-config-file-path=/etc \
+--enable-fpm \
+--with-fpm-user=nginx  \
+--with-fpm-group=nginx \
+--enable-inline-optimization \
+--disable-debug \
+--disable-rpath \
+--enable-shared  \
+--enable-soap \
+--with-libxml-dir \
+--with-xmlrpc \
+--with-openssl \
+--with-mcrypt \
+--with-mhash \
+--with-pcre-regex \
+--with-sqlite3 \
+--with-zlib \
+--enable-bcmath \
+--with-iconv \
+--with-bz2 \
+--enable-calendar \
+--with-curl \
+--with-cdb \
+--enable-dom \
+--enable-exif \
+--enable-fileinfo \
+--enable-filter \
+--with-pcre-dir \
+--enable-ftp \
+--with-gd \
+--with-openssl-dir \
+--with-jpeg-dir \
+--with-png-dir \
+--with-zlib-dir  \
+--with-freetype-dir \
+--enable-gd-native-ttf \
+--enable-gd-jis-conv \
+--with-gettext \
+--with-gmp \
+--with-mhash \
+--enable-json \
+--enable-mbstring \
+--enable-mbregex \
+--enable-mbregex-backtrack \
+--with-libmbfl \
+--with-onig \
+--enable-pdo \
+--with-mysqli=mysqlnd \
+--with-pdo-mysql=mysqlnd \
+--with-zlib-dir \
+--with-pdo-sqlite \
+--with-readline \
+--enable-session \
+--enable-shmop \
+--enable-simplexml \
+--enable-sockets  \
+--enable-sysvmsg \
+--enable-sysvsem \
+--enable-sysvshm \
+--enable-wddx \
+--with-libxml-dir \
+--with-xsl \
+--enable-zip \
+--enable-mysqlnd-compression-support \
+--with-pear \
+--enable-opcache
+
+
+
+location ~ \.php$ {
+            root           html;
+            fastcgi_pass   127.0.0.1:9000;
+            fastcgi_index  index.php;
+            fastcgi_param  SCRIPT_FILENAME  /scripts$fastcgi_script_name;
+            include        fastcgi_params;
+        }
+
+
+
+
+
+
+安装VirtualBox
+config.vm.synced_folder ".", "/vagrant", type: "virtualbox"
+vagrant plugin install vagrant-vbguest
+
+vagrant package centos7 --output centos7x86_64_v1.box --vagrantfile Vagrantfile
+安装ng
+tar -zxvf tengine-2.1.2.tar.gz
+rm -rf tengine-2.1.2.tar.gz
+
+yum install gcc-c++  
+yum -y install pcre pcre-devel  
+yum -y install zlib zlib-devel  
+yum -y install openssl openssl-devel
+
+  nginx path prefix: "/usr/local/nginx"
+  nginx binary file: "/usr/local/nginx/sbin/nginx"
+  nginx configuration prefix: "/usr/local/nginx/conf"
+  nginx configuration file: "/usr/local/nginx/conf/nginx.conf"
+  nginx pid file: "/usr/local/nginx/logs/nginx.pid"
+  nginx error log file: "/usr/local/nginx/logs/error.log"
+  nginx http access log file: "/usr/local/nginx/logs/access.log"
+  nginx http client request body temporary files: "client_body_temp"
+  nginx dso module path: "/usr/local/nginx/modules/"
+  nginx http proxy temporary files: "proxy_temp"
+  nginx http fastcgi temporary files: "fastcgi_temp"
+  nginx http uwsgi temporary files: "uwsgi_temp"
+  nginx http scgi temporary files: "scgi_temp"
+
+开机启动
+vim /lib/systemd/system/nginx.service
+[Unit]
+Description=nginx
+After=network.target
+
+[Service]
+Type=forking
+ExecStart=/usr/local/nginx/sbin/nginx
+ExecReload=/usr/local/nginx/sbin/nginx -s reload
+ExecStop=/usr/local/nginx/sbin/nginx -s quit
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
+
+systemctl enable nginx.service
+
+vim /etc/systemd/system/php-fpm.service
+
+[Unit]
+Description=The PHP FastCGI Process Manager
+After=syslog.target network.target
+
+[Service]
+Type=simple
+PIDFile=/run/php-fpm.pid
+ExecStart=/usr/local/sbin/php-fpm --nodaemonize --fpm-config /usr/local/etc/php-fpm.conf
+ExecReload=/bin/kill -USR2 $MAINPID
+ExecStop=/bin/kill -SIGINT $MAINPID
+
+[Install]
+WantedBy=multi-user.target
+
+systemctl enable php-fpm.service
+
+netstat -atunlp
+
+
+php
+rpm -ivh http://dl.fedoraproject.org/pub/epel/7/x86_64/e/epel-release-7-8.noarch.rpm
+rpm -Uvh https://mirror.webtatic.com/yum/el7/webtatic-release.rpm
+yum install php70w
+
+
+yum install libxml2 libxml2-devel openssl openssl-devel bzip2 bzip2-devel libcurl libcurl-devel libjpeg libjpeg-devel libpng libpng-devel freetype freetype-devel gmp gmp-devel libmcrypt libmcrypt-devel readline readline-devel libxslt libxslt-devel
+
+redis
+XSLTPROC           : /usr/bin/xsltproc
+XSLROOT            :
+
+PREFIX             : /usr/local
+BINDIR             : /usr/local/bin
+DATADIR            : /usr/local/share
+INCLUDEDIR         : /usr/local/include
+LIBDIR             : /usr/local/lib
+MANDIR             : /usr/local/share/man
+
+
+
+1.	[Unit]
+2.	Description=Redis on port 6379
+3.	[Service]
+4.	Type=forking
+5.	ExecStart=/etc/init.d/redis_6379 start
+6.	ExecStop=/etc/init.d/redis_6379 stop
+7.	[Install]
+8.	WantedBy=multi-user.target
+
+
+ docker run -p 83:80 --name myng -v $PWD/nginx/www:/www -v $PWD/nginx/conf:/etc/nginx/conf.d -v $PWD/nginx/logs:/wwwlogs  -d nginx
+ 
+ docker run -p 9001:9000 --name  php-fpm -v /vagrant/Docker/nginx/www:/www -v $PWD/conf:/usr/local/etc/php -v $PWD/logs:/phplogs   -d php
+ 
+ docker run -p 3307:3306 --name mysql -v $PWD/conf/my.cnf:/etc/mysql/my.cnf -v $PWD/logs:/logs -v $PWD/data:/mysql_data -e MYSQL_ROOT_PASSWORD=vagrant -d mysql
