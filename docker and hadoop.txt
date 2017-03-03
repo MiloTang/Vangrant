@@ -1,0 +1,403 @@
+﻿ Dockerfile完成Hadoop2.6的伪分布式搭建
+
+在 《Docker中搭建Hadoop-2.6单机伪分布式集群》中在容器中操作来搭建伪分布式的Hadoop集群，这一节中将主要通过Dokcerfile 来完成这项工作。
+
+1 获取一个简单的Docker系统镜像,并建立一个容器。
+
+　　 这里我选择下载CentOS镜像
+
+docker pull centos
+
+　　通过docker tag命令将下载的CentOS镜像名称换成centos，并删除老标签
+
+docker tag docker.io/centos centos
+docker rmr docker.io/centos
+
+2. JDK的安装和配置
+
+　　去Oracle官网提前下载好所需的jdk。
+
+　　建立文件夹，并将jdk copy到文件夹下
+
+[root@centos-docker ~]# mkdir centos-jdk
+[root@centos-docker ~]# mv jdk-7u79-linux-x64.tar.gz ./centos-jdk/
+[root@centos-docker ~]# cd centos-jdk/
+[root@centos-docker centos-jdk]# ls
+jdk-7u79-linux-x64.tar.gz
+
+　　在centos-jdk文件夹中建立Dockerfile，其内容如下：
+复制代码
+
+# CentOS with JDK 7
+# Author        amei
+
+# build a new image with basic  centos
+FROM centos
+# who is the author
+MAINTAINER amei
+
+# make a new directory to store the jdk files
+RUN mkdir /usr/local/java
+
+# copy the jdk  archive to the image,and it will automaticlly unzip the tar file
+ADD jdk-7u79-linux-x64.tar.gz /usr/local/java/
+
+# make a symbol link
+RUN ln -s /usr/local/java/jdk1.7.0_79 /usr/local/java/jdk
+
+# set environment variables
+ENV JAVA_HOME /usr/local/java/jdk
+ENV JRE_HOME ${JAVA_HOME}/jre
+ENV CLASSPATH .:${JAVA_HOME}/lib:${JRE_HOME}/lib
+ENV PATH ${JAVA_HOME}/bin:$PATH
+
+复制代码
+
+　　根据Dokcerfile创建新镜像：
+复制代码
+
+# 注意后边的 . 不能忘了
+[root@centos-docker centos-jdk]# docker build -t="centos-jdk" .
+Sending build context to Docker daemon 153.5 MB
+Step 1 : FROM centos
+ ---> e8f1bdb3b6a7
+.....................................
+Step 9 : ENV PATH ${JAVA_HOME}/bin:$PATH
+ ---> Running in 5ecbe2fac774
+ ---> ad1110b84433
+Removing intermediate container 5ecbe2fac774
+Successfully built ad1110b84433
+
+复制代码
+
+　　查看新建立的镜像
+
+[root@centos-docker centos-jdk]# docker images
+REPOSITORY          TAG                 IMAGE ID            CREATED             SIZE
+centos-jdk          latest              ad1110b84433        5 minutes ago       503 MB
+centos              latest              e8f1bdb3b6a7        2 weeks ago         196.7 MB
+
+　　建立容器，查看新的镜像中的JDK是否正确
+复制代码
+
+[root@centos-docker centos-jdk]# docker run -it centos-jdk /bin/bash
+[root@b665dbff9965 /]# java -version　　　　# 出来结果表明配置没问题
+java version "1.7.0_79"
+Java(TM) SE Runtime Environment (build 1.7.0_79-b15)
+Java HotSpot(TM) 64-Bit Server VM (build 24.79-b02, mixed mode)
+[root@b665dbff9965 /]# echo $JAVA_HOME
+/usr/local/java/jdk
+
+复制代码
+
+3. 在前一步基础上安装ssh
+
+　　建立新的文件夹，并在其下建立Dokcerfile文件，其内容为：
+复制代码
+
+# build a new image with centos-jdk
+FROM centos-jdk
+# who is the author
+MAINTAINER amei
+
+# install openssh
+RUN yum -y  install openssh-server openssh-clients
+
+#generate key files
+RUN ssh-keygen -q -t rsa -b 2048 -f /etc/ssh/ssh_host_rsa_key -N ''
+RUN ssh-keygen -q -t ecdsa -f /etc/ssh/ssh_host_ecdsa_key -N ''
+RUN ssh-keygen -q -t dsa -f /etc/ssh/ssh_host_ed25519_key  -N ''
+
+# login localhost without password
+RUN ssh-keygen -f /root/.ssh/id_rsa -N ''
+RUN touch /root/.ssh/authorized_keys
+RUN cat /root/.ssh/id_rsa.pub >> /root/.ssh/authorized_keys
+
+# set password of root
+RUN echo "root:1234" | chpasswd
+
+# open the port 22
+EXPOSE 22
+# when start a container it will be executed
+CMD ["/usr/sbin/sshd","-D"]
+
+复制代码
+
+　　利用此Dockerfile 建立镜像：
+
+[root@centos-docker centos-jdk-ssh]# docker build -t "centos-jdk-ssh" .
+Sending build context to Docker daemon  2.56 kB
+Step 1 : FROM centos-jdk
+ ---> ad1110b84433
+。。。。。。。。。。。。。。。。。。。。。。。。
+Successfully built 5286623a6cc0
+
+　　验证建立好的镜像：
+复制代码
+
+#在刚才的镜像之上建立容器
+[root@centos-docker centos-jdk-ssh]# docker run -it centos-jdk-ssh /bin/bash 
+[root@118f3d29fc73 /]# /usr/sbin/sshd　　　　　　#开启sshd服务
+[root@118f3d29fc73 /]# ssh root@localhost　　　 #登陆到本机
+The authenticity of host 'localhost (::1)' can't be established.　　　　# 观察确实不用密码即可登陆
+ECDSA key fingerprint is b7:f0:33:15:c9:ca:12:8b:93:0d:45:95:6f:43:4f:78.
+Are you sure you want to continue connecting (yes/no)? yes
+Warning: Permanently added 'localhost' (ECDSA) to the list of known hosts.
+[root@118f3d29fc73 ~]# exit　　　　#退出容器
+logout
+Connection to localhost closed.
+
+复制代码
+
+ 
+
+4. 安装Hdoop2.6
+
+　　首先先下载好hadoop安装包。
+
+　　建立文件夹，并在文件夹下建立如下几个文件。
+
+　　编辑core-site.xml文件
+复制代码
+
+<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
+
+<configuration>
+        <property>
+                <name>hadoop.tmp.dir</name>
+                <value>file:/data/hadoop/tmp</value>
+        </property>
+        <property>
+                <name>fs.defaultFS</name>
+                <value>hdfs://localhost:9000</value>
+        </property>
+</configuration>
+
+复制代码
+
+　　编辑hdfs-site.xml文件
+复制代码
+
+<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
+
+<configuration>
+        <property>
+                <name>dfs.replication</name>
+                <value>1</value>
+        </property>
+        <property>
+                <name>dfs.namenode.name.dir</name>
+                <value>file:/data/hadoop/dfs/name</value>
+        </property>
+        <property>
+                <name>dfs.datanode.data.dir</name>
+                <value>file:/data/hadoop/dfs/data</value>
+        </property>
+</configuration>
+
+复制代码
+
+ 
+
+　　在其下建立Dokcerfile文件，其内容为：
+复制代码
+
+# build a new image with  centos-jdk-ssh
+FROM centos-jdk-ssh
+# who is the author
+MAINTAINER amei
+
+# install some important software
+RUN yum -y install net-tools  which
+
+# copy the hadoop  archive to the image,and it will automaticlly unzip the tar file
+ADD hadoop-2.6.0.tar.gz /usr/local/
+
+# make a symbol link
+RUN ln -s /usr/local/hadoop-2.6.0 /usr/local/hadoop
+
+# copy the configuration file to image
+COPY core-site.xml /usr/local/hadoop/etc/hadoop/
+COPY hdfs-site.xml /usr/local/hadoop/etc/hadoop/
+
+# change hadoop environment variables
+RUN sed -i "s?JAVA_HOME=\${JAVA_HOME}?JAVA_HOME=/usr/local/java/jdk?g" /usr/local/hadoop/etc/hadoop/hadoop-env.sh
+
+# set environment variables
+ENV HADOOP_HOME /usr/local/hadoop
+ENV PATH ${HADOOP_HOME}/bin:${HADOOP_HOME}/sbin:$PATH
+
+复制代码
+
+　　此时文件夹下的文件有：
+
+[root@centos-docker centos-hadoop]# ll
+total 190704
+-rw-r--r--. 1 root root       403 Aug  7 06:52 core-site.xml
+-rw-r--r--. 1 root root       708 Aug  7 06:52 Dockerfile
+-rwxr-x---. 1 root root 195257604 Aug  7 04:44 hadoop-2.6.0.tar.gz
+-rw-r--r--. 1 root root       546 Aug  7 06:25 hdfs-site.xml
+
+　　建立镜像：
+
+docker build -t "centos-hadoop" .
+
+　　查看镜像：
+
+[root@centos-docker centos-hadoop]# docker images
+REPOSITORY          TAG                 IMAGE ID            CREATED             SIZE
+centos-hadoop       latest              64b9d221973b        29 minutes ago      930 MB
+centos-jdk-ssh      latest              5286623a6cc0        About an hour ago   600 MB
+centos-jdk          latest              ad1110b84433        2 hours ago         503 MB
+
+　　建立容器测试镜像：
+复制代码
+
+[root@centos-docker centos-hadoop]# docker run -it centos-hadoop /bin/bash  #开启容器
+[root@889d94ef9cbc /]#/usr/sbin/sshd　　　　　　　　　　　　#开启sshd服务
+[root@889d94ef9cbc /]# hdfs namenode -format　　　　　　　　#格式化namenode
+16/08/06 22:56:34 INFO namenode.NameNode: STARTUP_MSG:
+/************************************************************
+STARTUP_MSG: Starting NameNode
+STARTUP_MSG:   host = 889d94ef9cbc/172.17.0.2
+STARTUP_MSG:   args = [-format]
+STARTUP_MSG:   version = 2.6.0
+............................................................
+16/08/06 22:56:36 INFO common.Storage: Storage directory /data/hadoop/dfs/name has been successfully formatted.
+16/08/06 22:56:37 INFO namenode.NNStorageRetentionManager: Going to retain 1 images with txid >= 0
+16/08/06 22:56:37 INFO util.ExitUtil: Exiting with status 0
+16/08/06 22:56:37 INFO namenode.NameNode: SHUTDOWN_MSG:
+/************************************************************
+SHUTDOWN_MSG: Shutting down NameNode at 889d94ef9cbc/172.17.0.2
+************************************************************/
+[root@889d94ef9cbc /]# start-dfs.sh 　　# 开启hdfs
+[root@889d94ef9cbc /]# jps　　　　　　#查看开启的应用程序
+576 SecondaryNameNode
+410 DataNode
+684 Jps
+328 NameNode
+[root@889d94ef9cbc /]# hadoop dfsadmin -report　　#查看HDFS状况
+DEPRECATED: Use of this script to execute hdfs command is deprecated.
+Instead use the hdfs command for it.
+
+Configured Capacity: 10726932480 (9.99 GB)
+Present Capacity: 9748041728 (9.08 GB)
+DFS Remaining: 9748037632 (9.08 GB)
+DFS Used: 4096 (4 KB)
+DFS Used%: 0.00%
+Under replicated blocks: 0
+Blocks with corrupt replicas: 0
+Missing blocks: 0
+
+-------------------------------------------------
+Live datanodes (1):
+
+Name: 127.0.0.1:50010 (localhost)
+Hostname: 889d94ef9cbc
+Decommission Status : Normal
+Configured Capacity: 10726932480 (9.99 GB)
+DFS Used: 4096 (4 KB)
+Non DFS Used: 978890752 (933.54 MB)
+DFS Remaining: 9748037632 (9.08 GB)
+DFS Used%: 0.00%
+DFS Remaining%: 90.87%
+Configured Cache Capacity: 0 (0 B)
+Cache Used: 0 (0 B)
+Cache Remaining: 0 (0 B)
+Cache Used%: 100.00%
+Cache Remaining%: 0.00%
+Xceivers: 1
+Last contact: Sat Aug 06 23:29:09 UTC 2016
+
+复制代码
+
+ 5. 将前边的步骤合在一起，用一个Dockerfile 来完成
+
+　　建立一个新的文件夹，文件夹要包含建立进行所需的资源。
+复制代码
+
+[root@centos-docker centos-hadoop]# ll
+total 340616
+-rw-r--r--. 1 root root       403 Aug  7 06:52 core-site.xml　　
+-rw-r--r--. 1 root root       812 Aug  7 18:04 Dockerfile
+-rwxr-x---. 1 root root 195257604 Aug  7 04:44 hadoop-2.6.0.tar.gz
+-rw-r--r--. 1 root root       546 Aug  7 06:25 hdfs-site.xml
+-rwxr-x---. 1 root root 153512879 Aug  7 18:14 jdk-7u79-linux-x64.tar.gz
+
+复制代码
+
+　　Dockerfile中的内容为：
+
+　　
+复制代码
+
+# build a new hadoop image with basic  centos
+FROM centos
+# who is the author
+MAINTAINER amei
+
+# install some important softwares
+RUN yum -y install openssh-server openssh-clients  net-tools  which
+
+####################Configurate JDK################################
+# make a new directory to store the jdk files
+RUN mkdir /usr/local/java
+
+# copy the jdk  archive to the image,and it will automaticlly unzip the tar file
+ADD jdk-7u79-linux-x64.tar.gz /usr/local/java/
+
+# make a symbol link
+RUN ln -s /usr/local/java/jdk1.7.0_79 /usr/local/java/jdk
+
+###################Configurate SSH#################################
+#generate key files
+RUN ssh-keygen -q -t rsa -b 2048 -f /etc/ssh/ssh_host_rsa_key -N ''
+RUN ssh-keygen -q -t ecdsa -f /etc/ssh/ssh_host_ecdsa_key -N ''
+RUN ssh-keygen -q -t dsa -f /etc/ssh/ssh_host_ed25519_key  -N ''
+
+# login localhost without password
+RUN ssh-keygen -f /root/.ssh/id_rsa -N ''
+RUN cat /root/.ssh/id_rsa.pub >> /root/.ssh/authorized_keys
+
+
+###################Configurate Hadoop##############################
+# copy the hadoop  archive to the image,and it will automaticlly unzip the tar file
+ADD hadoop-2.6.0.tar.gz /usr/local/
+
+# make a symbol link
+RUN ln -s /usr/local/hadoop-2.6.0 /usr/local/hadoop
+
+# copy the configuration file to image
+COPY core-site.xml /usr/local/hadoop/etc/hadoop/
+COPY hdfs-site.xml /usr/local/hadoop/etc/hadoop/
+
+# change hadoop environment variables
+RUN sed -i "s?JAVA_HOME=\${JAVA_HOME}?JAVA_HOME=/usr/local/java/jdk?g" /usr/local/hadoop/etc/hadoop/hadoop-env.sh
+
+
+################### Integration configuration #######################
+# set environment variables
+ENV JAVA_HOME /usr/local/java/jdk
+ENV JRE_HOME ${JAVA_HOME}/jre
+ENV CLASSPATH .:${JAVA_HOME}/lib:${JRE_HOME}/lib
+ENV HADOOP_HOME /usr/local/hadoop
+ENV PATH ${HADOOP_HOME}/bin:${HADOOP_HOME}/sbin:${JAVA_HOME}/bin:$PATH
+
+# set password of root
+RUN echo "root:1234" | chpasswd
+# when start a container it will be executed
+CMD ["/usr/sbin/sshd"]
+
+复制代码
+
+ 以此Dockerfile来建立Hadoop镜像
+
+docker build -t "centos-hadoop" .
+
+ 
+
+6. 后话
+
+Dockerfile和jdk,hadoop文件以及其它的配置文件都打包好放在百度云上，解压之后可以直接在目录中敲入命令  docker build -t "centos-hadoop" .  建立Hadoop镜像，不过前提是你得先有一个centos镜像。

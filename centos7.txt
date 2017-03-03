@@ -278,6 +278,8 @@ location ~ \.php$ {
 config.vm.synced_folder ".", "/vagrant", type: "virtualbox"
 vagrant plugin install vagrant-vbguest
 
+vagrant init
+vagrant box add centos8
 vagrant package centos7 --output centos7x86_64_v1.box --vagrantfile Vagrantfile
 安装ng
 tar -zxvf tengine-2.1.2.tar.gz
